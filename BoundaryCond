@@ -1,0 +1,183 @@
+function [GSM,GSMVarsNames,KnownForces,KnownForcesValues,Alldisplacements]=BoundaryCond(GSM0,GSMVarsNames,ForcesNames,KnownName,valuevars)
+
+global ScreenOption Symbway
+
+%--- VECTOR OF FORCES
+%--- a) Identify the known forces
+KnownForces=zeros(length(ForcesNames),1);
+KnownForcesValues=sym(zeros(length(ForcesNames),1));
+KnownForcesname=cell(length(ForcesNames),1);
+typeknown=zeros(size(KnownName));
+for i=1:length(ForcesNames)
+    for j=1:length(KnownName)
+        if isequal(ForcesNames{i},KnownName{j})
+            KnownForces(i)=i;
+            KnownForcesValues(i)=valuevars(j);
+            KnownForcesname(i)=KnownName(j);
+            typeknown(j)=1;
+            break
+        end
+    end
+end
+
+%--- E variable: delete from the list when it is known
+lengthGSMVars=length(GSMVarsNames);
+factor=ones(1,lengthGSMVars);
+for i=1:length(KnownName)
+    aux=KnownName{i};
+    if strcmp('E',aux(1))
+        typeknown(i)=2;
+        Evar=KnownName{i};
+        for j=1:lengthGSMVars
+            auxvar=GSMVarsNames{j};
+            pos=strfind(auxvar,Evar);
+            if ~isempty(pos)
+                GSMVarsNames{j}=auxvar(setdiff(1:15,pos:pos+4));
+                factor(j)=factor(j)*valuevars(i);
+            end
+        end
+    end
+end
+
+%--- A or I variable: delete from the list when it is known
+nulcol=[];
+for i=1:length(KnownName)
+    aux=KnownName{i};
+    if strcmp('A',aux(1))||strcmp('I',aux(1))
+        typeknown(i)=3;
+        AIvar=KnownName{i};
+        for j=1:lengthGSMVars
+            auxvar=GSMVarsNames{j};
+            pos=strfind(auxvar,AIvar);
+            if ~isempty(pos)
+                len=length(GSMVarsNames{j});
+                if valuevars(i)~=0
+                    GSMVarsNames{j}=auxvar(setdiff(1:len,pos:pos+4));                    
+                else
+                    GSMVarsNames{j}='';
+                    nulcol=[nulcol,j];
+                end
+                factor(j)=factor(j)*valuevars(i);
+            end
+        end
+    end
+end
+
+%--- Q variable: delete from the list when it is known
+for i=1:length(KnownName)
+    aux=KnownName{i};
+    if strcmp('Q',aux(1))
+        typeknown(i)=4;
+        Qvar=KnownName{i};
+        for j=1:lengthGSMVars
+            auxvar=GSMVarsNames{j};
+            pos=strfind(auxvar,Qvar);
+            if ~isempty(pos)
+                len=length(GSMVarsNames{j});
+                if valuevars(i)~=0
+                    GSMVarsNames{j}=auxvar(setdiff(1:len,pos:pos+4));                    
+                else
+                    GSMVarsNames{j}='';
+                    nulcol=[nulcol,j];
+                end
+                factor(j)=factor(j)*valuevars(i);
+            end
+        end
+    end
+end
+
+Alldisplacements=unique(GSMVarsNames);
+
+%--- Multiply by the factor associated with the E, A, I and Q
+for i=1:lengthGSMVars
+    GSM0(:,i)=GSM0(:,i)*factor(i);
+end
+
+%--- BOUNDARY CONDITIONS
+%--- a) Identify the known deplacements
+knowndesplac=KnownName(typeknown==0);
+valuedesplac=valuevars(typeknown==0);
+
+%--- b) Identify the null known deplacements (boundary conditions)
+nulldesplac=knowndesplac(valuedesplac==0);
+
+%--- c) Delete the null variables and GSM columns associated with 
+for i=1:length(nulldesplac)
+    auxd=nulldesplac{i};
+    for j=1:lengthGSMVars
+        if ~isempty(strfind(GSMVarsNames{j},auxd))
+            GSMVarsNames(j)={''};
+            nulcol=[nulcol j];
+        end
+    end
+end
+validcolumn=setdiff(1:lengthGSMVars,nulcol);
+GSMVarsNames=GSMVarsNames(validcolumn);
+GSM1=GSM0(:,validcolumn);
+
+%--- GSM
+%--- get the equal columns together (deleting the repeated ones)
+allGSMVarsNames=unique(GSMVarsNames);
+[r,ni]=size(GSM1);
+if Symbway==0
+    GSM=zeros(r,length(allGSMVarsNames));
+else
+    GSM=sym(zeros(r,length(allGSMVarsNames)));
+end
+
+for i=1:length(allGSMVarsNames)
+    aux=[];
+    for j=1:length(GSMVarsNames)
+        if isequal(allGSMVarsNames(i),GSMVarsNames(j));
+            aux=[aux j];
+        end
+    end   
+    GSM(:,i)=sum(GSM1(:,aux),2);
+end
+
+%--- identify null columns in GSM and delete variable and column
+if Symbway==1
+    validcolumns=find(sum(abs(GSM),1)~=0);
+else
+    validcolumns=find(sum(abs(GSM),1)>1e-14);
+end
+GSM=GSM(:,validcolumns);
+GSMVarsNames=allGSMVarsNames(validcolumns);
+
+%--- Plotting information
+L=1; GSMnum=eval(GSM); %numerical GSM
+if ScreenOption==1
+    fprintf('--- After applying boundary conditions, GSM and variables:\n')
+    GSM, 
+    PrintMatrix('GSMnum:',GSMnum,'%10.3f');
+    GSMVarsNames'
+elseif ScreenOption==2
+    [r,c]=size(GSMnum);
+    fprintf('%%--- After applying boundary conditions, GSM and variables:\n');
+    % Symbolic GSM
+    fprintf('Symbolic GSM: $$%s$$\n',latex(GSM));
+    % Numeric GSM
+    fprintf('Numeric GSM: $$\\left(\\begin{array}{');
+    for i=1:c
+        fprintf('c');
+    end
+    fprintf('}');
+    for i=1:r-1
+        for j=1:c-1
+            fprintf('%-10.3f & ',GSMnum(i,j));
+        end
+        fprintf('%-10.3f \\\\',GSMnum(i,end)); %last column
+    end
+    for j=1:c-1 %last row
+        fprintf('%-10.3f & ',GSMnum(end,j));
+    end
+    fprintf('%-10.3f  \\end{array}\\right)$$\n',GSMnum(end,end)); %last column and last row
+   
+    % GSM variables
+    fprintf('GSM variables: $$\\left(\\begin{array}{c}');
+    for i=1:length(GSMVarsNames)-1
+        fprintf('%s \\\\   ',GSMVarsNames{i});
+    end
+    fprintf('%s  \\end{array}\\right)$$  \n\n',GSMVarsNames{end});
+end
+
