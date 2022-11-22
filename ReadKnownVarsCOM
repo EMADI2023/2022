@@ -1,0 +1,227 @@
+function [KnownName1,valuevars1]=ReadKnownVarsCOM(ForcesNames,nnodes,nbeams,iterCOM,SRC)
+digits (32)
+global knownuvw knownEAIQI knownEAEIEQI 
+global valueuvw valueEAIQI valueEAEIEQI 
+global  knownEAISdirect reactionsCOM
+global subbeamsEAIQI beamlength  v valueEAISdirectCOM Qiter inversevalueEAISdirect
+
+direct=1
+
+
+ScreenOption=0
+%global iterCOMA iterCOMI iterCOMQ
+ScreenOption=0
+valueEAISdirect = valueEAISdirectCOM
+% valueEAISdirect{2}= iterCOM*valueEAISdirect{2}
+% valueEAISdirect{3}= [0.9 1.1].*valueEAISdirect{3}
+% valueEAISdirect{4}= [1.4 0.8].*valueEAISdirect{4}
+
+
+if SRC==0
+     global Par_initialCOM
+    for i=1:length(valueEAISdirect{2})
+        
+        valueEAISdirect{2}(1,i)= Par_initialCOM{i,2}
+    end
+
+for j=1:length(valueEAISdirect{3})
+    valueEAISdirect{3}(1,j)= Par_initialCOM{i+j,2}
+end
+
+
+for l=1:length(valueEAISdirect{4})
+    valueEAISdirect{4}(1,l)= Par_initialCOM{i+j+l,2}
+end
+
+    
+end
+
+inversevalueEAISdirect = valueEAISdirect
+
+
+KnownName=cell(1,8*nnodes+7*nbeams);
+valuevars=sym([]);
+ind=1;
+
+%--- Create forces as symbolic variables
+for i=1:nnodes
+    eval(sprintf('syms H%04.0f',i))
+    eval(sprintf('syms V%04.0f',i)) 
+    eval(sprintf('syms M%04.0f',i)) 
+end
+
+%--- Displacements & forces
+[r c]=size(knownuvw);
+auxvar='uvw';
+
+for node=1:nnodes 
+    for j=1:3
+        pos=find(node==knownuvw{j,:});
+        if ~isempty(pos) && valueuvw{j}(pos)==0
+            KnownName{ind}=sprintf('%s%04.0f',auxvar(j),node);
+            valuevars=[valuevars valueuvw{j}(pos)];            
+        else
+            KnownName(ind)=ForcesNames(3*(node-1)+j);
+            valuevars=[valuevars KnownName(ind)];
+        end
+        ind=ind+1;
+    end
+end
+
+%--- Individual E,A,I/Q
+if direct==1
+    transformdata={[1:16]; [1 3 9 11]; [2 4 5 10 12 13]; [6 7 8 14 15 16]}; 
+    auxvar='EAIQ';
+    for beam=1:nbeams
+        for k=1:4
+            type=subbeamsEAIQI{k}(beam);
+            pos=find(type==knownEAISdirect{k});
+            if pos>0
+                for r=transformdata{k}   
+                    KnownName{ind}=sprintf('%s%04.0f',auxvar(k),knownEAISdirect{k}(pos));             
+                    valuevars=[valuevars valueEAISdirect{k}(pos)];
+                    ind=ind+1;
+                end
+            end
+        end
+    end
+else
+    transformdata={[1:16]; [1 3 9 11]; [2 4 5 10 12 13]; [6 7 8 14 15 16]};  
+    auxvar='EAIQ';
+    for beam=1:nbeams
+        for k=1:4
+            type=subbeamsEAIQI{k}(beam);
+            pos=find(type==knownEAIQI{k});
+            if pos>0
+                for r=transformdata{k}   
+                    KnownName{ind}=sprintf('%s%04.0f',auxvar(k),knownEAIQI{k}(pos));             
+                    valuevars=[valuevars valueEAIQI{k}(pos)];
+% disp('readknownvars line 68 changed')
+%                     valuevars=[valuevars sprintf('%s%04.0f',auxvar(k),knownEAIQI{k}(pos))];
+                    ind=ind+1;
+                end
+            end
+        end
+    end
+end
+
+%---   EA and EI
+auxvar='AEEIEQ';
+for beam=1:nbeams
+    for k=1:3
+        pos=find(beam==knownEAEIEQI{k});
+        if pos>0
+            for r=transformdata{k+1}
+                KnownName{ind}=sprintf('%s%04.0f%s%04.0f',auxvar(2*k-1),knownEAEIEQI{k}(pos),auxvar(2*k),knownEAEIEQI{k}(pos));
+                valuevars=[valuevars valueEAEIEQI{k}(pos)];
+                ind=ind+1;
+            end
+        end
+    end
+end
+
+%--- Delete the empty cells
+KnownName=KnownName(1:ind-1);
+valuevars=valuevars(1:ind-1);
+
+%--- Sort and check the solution
+[KnownName,ind]=sort(KnownName);
+valuevars=valuevars(ind);
+
+[KnownName1,pos0,pos]=unique(KnownName);
+valuevars1=valuevars(pos0);
+
+if direct==1
+    cont1=1;
+    cont2=1;
+    cont3=1;
+    for i=1:length(KnownName1)
+        aux1=char(KnownName1(i));
+        auxL=aux1(1:1);
+        auxN=str2double(aux1(2:end));
+        if auxL=='E'
+            auxE(cont1)=auxN;
+            valueE(cont1)=valuevars1(i);
+            cont1=cont1+1;
+        elseif auxL=='I'
+            auxI(cont2)=auxN;
+            valueI(cont2)=valuevars1(i);
+            cont2=cont2+1;
+        elseif auxL=='Q'
+            auxQ(cont3)=auxN;
+            valueQ(cont3)=valuevars1(i);
+            cont3=cont3+1;
+        end
+    end
+
+    for i=1:length(subbeamsEAIQI{1})
+        auxl=beamlength(i);
+        subE=subbeamsEAIQI{1}(i);
+        subI=subbeamsEAIQI{3}(i);
+        subQ=subbeamsEAIQI{4}(i);
+        for j=1:length(auxE)
+            if auxE(j)==subE
+                valE=valueE(j);
+            end
+        end
+        for j=1:length(auxI)
+            if auxI(j)==subI
+                valI=valueI(j);
+            end
+        end
+        for j=1:length(auxQ)
+            if auxQ(j)==subQ
+                valQ=valueQ(j);
+            end
+        end
+        if valQ==0
+            Q(i)=sym(0);
+       else
+            Q(i)=valI*((12*valE*valI)/((valE/(2+2*v))*valQ*auxl^2))/(1+((12*valE*valI)/((valE/(2+2*v))*valQ*auxl^2)));
+                end
+    end
+    L=1;
+  Q=unique(Q,'stable')
+   
+%    if 2~=length(Q)
+%        dfvdfdsdgsrt
+%     end
+   Q=sym(eval(Q));
+%     Q(:,3)= []  
+   Qiter=Q
+    cont1=1;
+    for i=1:length(KnownName1)
+        aux1=char(KnownName1(i));
+        auxL=aux1(1:1);
+        if auxL=='Q'
+            valuevars1(i)=Q(cont1);
+            cont1=cont1+1;
+        end
+    end
+end
+
+%--- Plotting information
+if ScreenOption==1
+    fprintf('--- Initial known forces and boundary conditions:\n')
+    for i=1:length(valuevars1)
+        fprintf('%s: %s\n',KnownName1{i},char(valuevars1(i)))
+    end   
+    fprintf('\n')
+elseif ScreenOption==2
+    fprintf('%%--- Initial known forces and boundary conditions:\n')
+    fprintf('\\begin{tabular}{llllllll}\n');
+    ncol=8;
+    for i=1:ceil(length(valuevars1)/ncol)*ncol
+        if i<=length(valuevars1)
+            fprintf('%s=%s',KnownName1{i},char(valuevars1(i)));
+        end
+        if floor(i/ncol)==i/ncol && i<length(valuevars1)
+            fprintf('\\\\ \n');
+        elseif floor(i/ncol)==i/ncol && i==ceil(length(valuevars1)/ncol)*ncol
+            fprintf(' \n');
+        else
+            fprintf(' & ');
+        end
+    end
+    fprintf('\\end{tabular}\n\n')
+end
