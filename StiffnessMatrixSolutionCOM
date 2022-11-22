@@ -1,0 +1,153 @@
+function [measur_values2,reactions3]=StiffnessMatrixSolutionCOM(iterCOM,SRC)
+global error
+global knownfxfym valuefxfym beams beamlength nnodes nbeams nsize nodecoordinates theta
+global Shearrotation
+global subbeamsEAIQI knownEAISdirect  v measurements 
+global reactions3
+% adding measurments 
+measurements=cell (1,2)
+measurements{1,1}=zeros(nsize)
+measurements{1,2}=zeros(nsize)
+% clc;
+error=1e-14;
+diary 'Results Direct Analysis.txt'
+ direct=1
+%--- Create the modify stiffness matrix, the variable names associated with the GSM and vector of forces
+GSM=AssemblingModifiedStiffnessMatrixNEW(beams,beamlength,nodecoordinates,nnodes,nbeams,nsize);
+[GSM,GSMVarsNames]=CreateGSMVarNames(GSM,nsize,nbeams,beams);
+ForcesNames=CreateForcesVector(nnodes);
+
+%--- Identify the known variables and impose the boundary conditions
+direct=1;
+
+[KnownName,valuevars]=ReadKnownVarsCOM(ForcesNames,nnodes,nbeams,iterCOM,SRC)
+direct=0;
+[GSM,GSMVarsNames,KnownForces,KnownForcesValues,Alldisplacements]=BoundaryCond(GSM,GSMVarsNames,ForcesNames,KnownName,valuevars);
+
+%Vector of forces: rows
+UnknownForces=KnownForces(KnownForces==0);
+Nu=length(UnknownForces); %number of unknown forces
+Nk=length(KnownForces(KnownForces~=0)); %number of known forces
+posknownforces=KnownForces(KnownForces~=0)';
+posunknownforces=setdiff(1:Nk+Nu,posknownforces);
+z=[GSMVarsNames,ForcesNames(posunknownforces)'];
+fprintf('--- Unknown variables\n')
+z'
+d=[KnownForcesValues(KnownForces~=0);zeros(Nu,1)];
+validcol=find(d~=0);
+zpd_vector=d(validcol);
+
+rows=find(d~=0);
+nullrows=length(d)-length(rows);
+zd=z(1:end-nullrows);
+
+n=1;
+for j=1:length(KnownForces)
+    if KnownForces(j)~=0;
+        validrow(n)=KnownForces(j);
+        n=n+1;
+    end
+end
+
+GSM1=GSM(validrow,:);
+L=1;
+GSM2=eval(GSM1);
+zpd_matrix=pinv(GSM2);
+
+nvars=length(zpd_vector);
+
+%--- Data query
+NumVal=zeros(1,nvars);
+% a) input data
+
+%--- Shearch the loads in the ReadData
+cont1=1;
+for j=1:nvars
+    aux1=char(zpd_vector(j));
+    aux2=str2double(aux1(2:end));
+    if strcmp(aux1(1),'H')
+        if isempty(valuefxfym{1})
+ %           fprintf(char(zpd_vector(cont1))); fprintf(' value is empty in ReadDATA -- Default value = 0 \n');
+            cont1=cont1+1;
+        else
+            for k=1:length(knownfxfym{1})
+                if knownfxfym{1}(k)==aux2
+                    NumVal(1,cont1)=valuefxfym{1}(k);
+                end
+            end
+            cont1=cont1+1;
+        end
+    elseif strcmp(aux1(1),'V')
+        if isempty(valuefxfym{2})
+  %          fprintf(char(zpd_vector(cont1))); fprintf(' value is empty in ReadDATA -- Default value = 0 \n');
+            cont1=cont1+1;
+        else
+            for k=1:length(knownfxfym{2})
+                if knownfxfym{2}(k)==aux2
+                    NumVal(1,cont1)=valuefxfym{2}(k);
+                end
+            end
+            cont1=cont1+1;
+        end
+    elseif strcmp(aux1(1),'M')
+        if isempty(valuefxfym{3})
+%            fprintf(char(zpd_vector(cont1))); fprintf(' value is empty in ReadDATA -- Default value = 0 \n');
+            cont1=cont1+1;
+        else
+            for k=1:length(knownfxfym{3})
+                if knownfxfym{3}(k)==aux2
+                    NumVal(1,cont1)=valuefxfym{3}(k);
+                end
+            end
+            cont1=cont1+1;
+        end
+    end
+end
+
+% b) evalue the introduced data
+zpd_vector=NumVal';
+
+%--- Multiply zpd_matrix by zpd_vector
+zd_val=zpd_matrix*zpd_vector;
+
+%--- Compute the vector of forces
+forces_vect=GSM*zd_val;
+
+
+%--- Identify the reactions
+for i=1:length(zd_val)
+    aux=abs(zd_val(i));
+    if aux<=error
+        zd_val(i)=0;
+    end
+end
+L=1;
+reaction_name=ForcesNames(KnownForces==0);
+reactions2=eval(forces_vect(KnownForces==0));
+measur_values2={zd',zd_val};
+reactions3 =cell(length(reaction_name),2)
+reactions3(:,1)= reaction_name;
+reactions3(:,2)= num2cell(reactions2)
+
+%--- Plotting information
+fprintf('\n--- Reactions2\n')
+for i=1:length(reactions2)
+    fprintf('%s = %-10.3f\n',reaction_name{i},reactions2(i))
+end
+if Shearrotation == 1 
+inverse=1
+ measurements2=shearrotation(nbeams,beamlength,measur_values2,KnownName,valuevars,inverse)
+
+ 
+else 
+    fprintf('\n--- Displacements\n')
+
+    for i=1:length(zd)
+    fprintf('%s = %.10d\n',zd{i},zd_val(i))
+end
+    
+end
+
+fprintf('\n')
+
+diary off 
