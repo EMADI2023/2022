@@ -1,0 +1,45 @@
+function [GSM,allGSMVarNames]=CreateGSMVarNames(GSM0,nsize,nbeams,beams)
+
+global subbeamsEAIQI
+global ScreenOption Symbway
+
+%--- create the complete list of variables
+varnames=['E' 'A' 'u'; 'E' 'I' 'u'; 'E' 'A' 'v'; 'E' 'I' 'v'; 'E' 'I' 'w'; 'E' 'Q' 'u'; 'E' 'Q' 'v'; 'E' 'Q' 'w'];
+allGSMVarNames=cell(1,nsize);
+transformvar=[2 3 2 3 3 4 4 4];
+cont=0;
+for beam=1:nbeams
+    for beamextreme=1:2
+        beamnode=beams(beam,beamextreme);
+        for k=1:8
+            cont=cont+1;
+            allGSMVarNames{cont}=[allGSMVarNames{cont} varnames(k,1) sprintf('%04.0f',subbeamsEAIQI{1}(beam)) varnames(k,2) sprintf('%04.0f',subbeamsEAIQI{transformvar(k)}(beam)) varnames(k,3) sprintf('%04.0f',beamnode)];
+        end
+    end
+end
+
+%--- identify the non-sense variables for this example
+validcolumns=find(sum(abs(GSM0),1)~=0);
+
+%--- delete the non-sense columns
+GSM0=GSM0(:,validcolumns);
+GSMVarNames=allGSMVarNames(validcolumns);
+
+%--- get the equal columns togueter (deleting the repeat ones)
+allGSMVarNames=unique(GSMVarNames);
+[r,ni]=size(GSM0);
+if Symbway==0
+    GSM=zeros(r,length(allGSMVarNames));
+else
+    GSM=sym(zeros(r,length(allGSMVarNames)));
+end
+
+for i=1:length(allGSMVarNames)
+    aux=[];
+    for j=1:length(GSMVarNames)
+        if isequal(allGSMVarNames(i),GSMVarNames(j));
+            aux=[aux j];
+        end
+    end   
+    GSM(:,i)=sum(GSM0(:,aux),2);
+end
