@@ -1,0 +1,25 @@
+function ForcesNames=CreateForcesVector(nnodes)
+global ScreenOption
+
+ForcesNames=cell(3*nnodes,1);
+%--- Forces and force-pair variables
+for i=1:nnodes
+    pos=3*i-2;
+    ForcesNames{pos}=['H' sprintf('%04.0f',i)];
+    ForcesNames{pos+1}=['V' sprintf('%04.0f',i)];
+    ForcesNames{pos+2}=['M' sprintf('%04.0f',i)];
+end
+
+
+%--- Plotting information
+if ScreenOption==1
+    fprintf('--- Initial vector of forces:\n')
+    ForcesNames
+elseif ScreenOption==2
+    fprintf('%%--- Initial vector of forces:\n')
+    fprintf('$$\\left(\\begin{array}{c}');
+    for i=1:length(ForcesNames)-1
+        fprintf('%s \\\\   ',ForcesNames{i});
+    end
+    fprintf('%s  \\end{array}\\right)$$ \n\n',ForcesNames{end});
+end
