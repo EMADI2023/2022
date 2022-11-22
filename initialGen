@@ -1,0 +1,168 @@
+
+load(['Str_Info'  Str_Name '.mat']);
+Par_initial=cell(length(A)+length(I)+length(Q),2);
+
+% Rand_initial=1.0*ones(length(A)+length(I),1);
+global  Qiter  iterCOM X  valueEAISdirectCOM primartmeasurement SRRBSF shearvarsorg Shearrotation Par_initialCOM
+Rand_initial=ones(length(A)+length(I)+ length(Q),1);
+%Rand_initial(2,1)=iterCOMI
+%global iterCOMA iterCOMI iterCOMQ
+for i=1:length(A)
+	Par_initial{i,1}=sprintf('%s%.4d','A',i);
+	Par_initial{i,2}=A(i)*Rand_initial(i);	
+end
+
+for i=1:length(I)
+	Par_initial{length(A)+i,1}=sprintf('%s%.4d','I',i);
+	Par_initial{length(A)+i,2}=I(i)*Rand_initial(i+length(A));	
+end
+
+checkingconter=2
+
+
+if SRC==0
+    
+    
+    % here we add shear parameter from the real values in order to replace
+    % it with the result that we will give from first iteration
+    Qza= valueEAISdirectCOM{4}
+    for i=1:length(Qza)
+	Par_initial{length(A)+length(I)+i,1}=sprintf('%s%.4d','Q',i);
+	Par_initial{length(A)+length(I)+i,2}=Qza(i)*Rand_initial(i+length(A)+ length(I));	
+    %Par_initial{length(A)+length(I)+i,2}=Q(i)*Rand_initial(i+length(A)+ length(I));	
+end
+    hame=length(X);
+Ivar=length(Par_initial);
+for ime= 1:hame
+    for jme=1:Ivar
+      
+       if  strcmp(X{ime,1},Par_initial{jme,1});
+           Par_initial(jme,2)=X(ime,2);
+       end
+    end
+      
+end
+Par_initialCOM=Par_initial
+     
+end
+
+%iterCOM=0
+%this direct analysis is for measurements order
+[measur_values2,loads_values2,react_values2]=DirectAnalysis('off',Par_initial);
+% [measur_values,reactions]=StiffnessMatrixSolutionCOM(Par_initial)
+[measur_values3,reactions3]=StiffnessMatrixSolutionCOM(iterCOM,SRC)
+a1124(:,1)=measur_values3{1};
+a1124(:,2)=num2cell(measur_values3{2});
+% measur_values3= a1124;
+[mearow meacol]=size(measur_values2);
+[Nmearow Nmeacol]=size(a1124);
+for ime= 1:mearow
+    for jme=1:Nmearow
+        answer=strcmp(measur_values2(ime,1),a1124(jme,1));
+       if  answer == 1;
+           measur_values2(ime,2)= a1124(jme,2);
+       end
+    end
+      
+end
+
+%this part we choose are reaction 
+[rearow reacol]=size(react_values2);
+[Nrearow Nreacol]=size(reactions3);
+for ire= 1:rearow
+    for jre=1:Nrearow
+        answer=strcmp(react_values2(ire,1),reactions3(jre,1));
+       if  answer == 1;
+           react_values2(ire,2)= reactions3(jre,2);
+       end
+    end
+      
+end
+
+Qiterdouble=eval(Qiter)
+for i=1:length(Q)
+	Par_initial{length(A)+length(I)+i,1}=sprintf('%s%.4d','Q',i);
+	Par_initial{length(A)+length(I)+i,2}=Qiterdouble(i);	
+    %Par_initial{length(A)+length(I)+i,2}=Q(i)*Rand_initial(i+length(A)+ length(I));	
+end
+
+
+
+meaval= length(primartmeasurement);
+shearval=length(SRRBSF);
+newmeasurevalue=zeros(shearval,1)
+for ime= 1:meaval
+    for jme=1:shearval
+       
+       if   strcmp(primartmeasurement(ime,1),shearvarsorg(jme,1));
+           newmeasurevalue(jme,1)= primartmeasurement{ime,2} - SRRBSF(jme,1) ;
+           
+       end
+    end
+      
+    end
+% a1125=num2cell(reactions3);
+% react_values2(:,2)=a1125
+
+%beneath lines are added to change actual measurement set to flextural
+%measurements 
+
+if Shearrotation == 1
+    meavalreal= length(Val_real);
+shearval=length(SRRBSF);
+for ime= 1:meavalreal
+    for jme=1:shearval
+       
+       if   strcmp(Val_real(ime,1),shearvarsorg(jme,1));
+           Val_real{ime,2}= newmeasurevalue(jme,1) ;
+       end
+    end
+      
+end
+
+% this part is for plting the result
+global globalcheckingconter
+checkingconter=globalcheckingconter
+if SRC== 1
+    checkingconter=1
+end
+  XX=newmeasurevalue
+   XX=XX'
+   t= checkingconter
+ 
+xlswrite('model.xls',XX,1,sprintf('BD%d',t))
+XX=SRRBSF
+   XX=XX'
+  
+ 
+xlswrite('model.xls',XX,1,sprintf('CX%d',t))
+
+
+  XX=reactions3(:,2)
+   XX=XX'
+xlswrite('model.xls',XX,1,sprintf('DX%d',t))
+   
+   meavalreal= length(measur_values);
+shearval=length(SRRBSF);
+for ime= 1:meavalreal
+    for jme=1:shearval
+       
+       if   strcmp(measur_values(ime,1),shearvarsorg(jme,1));
+           measur_values{ime,2}= newmeasurevalue(jme,1) ;
+       end
+    end
+      
+end
+globalmeasur_values=measur_values
+global globalmeasur_values
+
+
+end
+
+
+
+Val_initial=[measur_values2;
+	react_values2;
+	loads_values2;
+	{'L',[1]};
+	Par_initial;];
