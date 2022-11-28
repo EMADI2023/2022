@@ -1,0 +1,80 @@
+
+%global Measurement_set
+Str_Name='beam2';
+load([ 'Str_Info'  Str_Name '.mat']);
+global Measurement_set Shearrotation 
+Measured=Measurement_set;
+[B0,z0,D0]=EQtranscons(B,z,d,Measured);
+
+
+  xlswrite('model.xls',Measured,1,'B30')
+
+InitialGen;
+Nm=length(Measured);
+
+%%  control the display parameter
+Iterpar='iter';display=1;
+% Iterpar='off';display=1;
+% Iterpar='off';display=0;
+
+Error=0.05;
+dir=pwd;
+load([dir '\Data\Error ' num2str(Error*100) '%(' Str_Name ').mat']);
+nSample=1;
+
+
+disp('Start Estimation');
+for itrrtrr=1:50
+    global itrrtrr
+    [measur_values5]=StiffnessMatrixSolutionCOMFNAL
+    
+
+ 
+ a11250(:,1)=measur_values5{1};
+a11250(:,2)=num2cell(measur_values5{2});
+ 
+ measur_values10=measur_values
+   melavalreal= length(measur_values);
+shearlval=length(a11250);
+for ilme= 1:melavalreal
+    for jlme=1:shearlval
+       
+       if   strcmp(measur_values(ilme,1),a11250(jlme,1));
+           measur_values10(ilme,2)= a11250(jlme,2) ;
+       end
+    end
+      
+end
+    
+    
+
+
+
+
+for i=1:nSample
+  
+    
+    % consider the accuracy of the measurements
+    % 	measure_noisy=roundn(measure_noisy,-7);
+    % accurate data
+    
+     [q,p]=size(measur_values);
+       measure_noisy=zeros(1,q);
+      for iii=1:q
+         measure_sample(iii)=measur_values10{iii,2};
+         
+        
+         
+      end
+%     measure_sample(iii)=(0.8+(1.2-0.8)*rand)*
+%          measure_sample(iii)=(0.8+(1.2-0.8)*rand)*    
+    
+    [X,Residue,Par_abs,Par_scaled,fval]=constrainOM(B0,z0,D0,Val_real,Val_initial,par_est,Iterpar,measure_sample);
+%     [Xsym,Xval,Residue,Par_abs,Par_scaled,fval]=...
+%         constrainOM(B0,z0,D0,Val_real,Val_initial,par_est,Iterpar,...
+%         measure_sample);
+
+    
+end 
+
+end 
