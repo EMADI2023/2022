@@ -40,17 +40,13 @@ R = randperm(DataNum);
 trIndex = R(1 : TrNum);
 tsIndex = R(1+TrNum : end);
 
-Xtr = XN(trIndex,:);
-Ytr = YN(trIndex,:);
 
-Xts = XN(tsIndex,:);
-Yts = YN(tsIndex,:);
 
 %% Network Structure
 pr = [-1 1];
 PR = repmat(pr,InputNum,1);
 
-Network = newff(PR,[5 OutputNum],{'tansig' 'tansig'});
+Network;
 
 %% Training DNN
 Network = TrainDNN_Fcn(Network,Xtr,Ytr);
