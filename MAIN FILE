@@ -49,7 +49,7 @@ PR = repmat(pr,InputNum,1);
 Network;
 
 %% Training DNN
-Network = TrainDNN_Fcn(Network,Xtr,Ytr);
+Network = TrainDNN_Fcn(Network,Xtr,Ytr, hidden_size, after_layers , after_activations , output_size);
 
 %% Assesment
 YtrNet = sim(Network,Xtr')';
